@@ -14,7 +14,7 @@ export interface BlogResult {
 // Initialize the API with a default or stored key
 let apiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || '';
 let genAI: GoogleGenerativeAI | null = null;
-const geminiModel = "gemini-1.5-flash"; // Using a valid model name
+const geminiModel = "gemini-2.0-flash"; // Using a valid model name
 
 // Function to set the API key programmatically
 export const setApiKey = (key: string) => {
