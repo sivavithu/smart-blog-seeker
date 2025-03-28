@@ -52,7 +52,7 @@ export async function generateBlogRecommendations(query: string): Promise<BlogRe
     const prompt = `
       For the query "${query}", provide 4 blog post recommendations that match the user's need, come from authoritative sources, and offer practical insights. Each recommendation must include: title, domain, description, keyInsight, and url.
       
-      Return only the following JSON array, with no additional text, explanations, or markers outside the array:
+      Return only the following JSON array, with no additional text, explanations, or markers outside the array and only use valid urls:
       [
         {
           "title": "Blog Post Title",
