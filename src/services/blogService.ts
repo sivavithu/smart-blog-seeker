@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Define the structure of a blog result
 export interface BlogResult {
   id: string;
   title: string;
@@ -9,6 +10,7 @@ export interface BlogResult {
   url: string;
 }
 
+// Initialize the API
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("VITE_GEMINI_API_KEY is not set. Please configure it in your environment.");
@@ -20,91 +22,78 @@ export const generateBlogRecommendations = async (query: string): Promise<BlogRe
   if (!query.trim()) return [];
 
   try {
-    // Loose prompt: no format enforcement
+    // Prompt with a request for plausible URLs
     const prompt = `
       You are a blog recommendation expert. For the query "${query}",
       suggest 4 real blog posts that match the user's need, come from authoritative sources,
-      and offer practical insights. Provide the title, domain, description, key insight, and URL for each.
+      and offer practical insights. Provide the title, domain, description, key insight, and a plausible URL for each.
+      
+      Format the response as a JSON array like this:
+      [
+        {
+          "title": "Blog Post Title",
+          "domain": "example.com",
+          "description": "Why this blog post fits the query",
+          "keyInsight": "A key insight from the blog post",
+          "url": "https://example.com/blog-post-title"
+        }
+      ]
+      Note: The URLs should be plausible but can be hypothetical.
     `;
 
+    // Get the API response
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response.text();
-    console.log("Raw API response:", text); // For debugging
+    console.log("Raw API response:", text); // Log for debugging
 
-    // Parse the raw text into BlogResult objects
-    const blogResults = parseBlogRecommendations(text);
+    // Extract the JSON array from the response
+    const jsonStart = text.indexOf('[');
+    const jsonEnd = text.lastIndexOf(']') + 1;
+    if (jsonStart === -1 || jsonEnd === 0) {
+      throw new Error("No valid JSON array found in response");
+    }
+    const jsonString = text.slice(jsonStart, jsonEnd).trim();
 
-    if (blogResults.length === 0) {
-      throw new Error("No valid blog recommendations found in response");
+    // Parse the extracted JSON
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString) as { title: string; domain: string; description: string; keyInsight: string; url?: string }[];
+    } catch (parseError) {
+      console.error("JSON parsing failed:", parseError);
+      throw new Error("Invalid JSON format in API response");
     }
 
-    return blogResults.map((item, index) => ({
-      id: `gemini-${Date.now()}-${index}`,
-      ...item,
-      url: item.url || `https://${item.domain}`
-    }));
+    // Map the results and ensure plausible URLs
+    return parsed.map((item, index) => {
+      // Generate a URL if none is provided
+      const plausibleUrl = item.url || `https://${item.domain}/${item.title.toLowerCase().replace(/\s+/g, '-')}`;
+      return {
+        id: `gemini-${Date.now()}-${index}`,
+        title: item.title,
+        domain: item.domain,
+        description: item.description,
+        keyInsight: item.keyInsight,
+        url: plausibleUrl
+      };
+    });
 
   } catch (error: any) {
     console.error("Gemini API error:", error.message || error);
-    const errorMessage = error.message?.includes("API_KEY_INVALID")
+    const errorMessage = error.message?.includes("APIktir_KEY_INVALID")
       ? "Invalid API key. Check VITE_GEMINI_API_KEY."
       : error.message?.includes("rate limit")
       ? "API rate limit exceeded. Try again later."
-      : "Couldn't fetch results or parse response. Check raw output.";
+      : error.message?.includes("JSON")
+      ? "Invalid JSON format in API response. Check raw output."
+      : "Couldn't fetch results. Please refine your query.";
     return [{
       id: 'error',
       title: "Search Failed",
       domain: "try-again.com",
       description: errorMessage,
-      keyInsight: "Refine query or check API response",
+      keyInsight: "Check API key, query, or response format",
       url: "#"
     }];
   }
 };
-
-// Helper function to parse unstructured text into BlogResult objects
-function parseBlogRecommendations(text: string): Partial<BlogResult>[] {
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  const results: Partial<BlogResult>[] = [];
-  let currentBlog: Partial<BlogResult> = {};
-
-  for (const line of lines) {
-    // Heuristic parsing based on common patterns
-    if (line.match(/^\d+\.|^-|^Title:/i)) {
-      // Start of a new blog entry
-      if (Object.keys(currentBlog).length > 0) {
-        results.push(currentBlog);
-      }
-      currentBlog = { title: line.replace(/^\d+\.|^-|^Title:/i, '').trim() };
-    } else if (line.toLowerCase().includes("domain")) {
-      currentBlog.domain = line.split(/domain:?/i)[1]?.trim() || "unknown.com";
-    } else if (line.toLowerCase().includes("description") || line.toLowerCase().includes("why")) {
-      currentBlog.description = line.split(/description:?|why:?/i)[1]?.trim() || line;
-    } else if (line.toLowerCase().includes("insight") || line.toLowerCase().includes("key")) {
-      currentBlog.keyInsight = line.split(/insight:?|key:?/i)[1]?.trim() || line;
-    } else if (line.toLowerCase().includes("url") || line.startsWith("http")) {
-      currentBlog.url = line.split(/url:?/i)[1]?.trim() || line;
-    } else if (Object.keys(currentBlog).length > 0) {
-      // Append to description if no clear field match
-      currentBlog.description = `${currentBlog.description || ''} ${line}`.trim();
-    }
-
-    // Limit to 4 results
-    if (results.length >= 4) break;
-  }
-
-  // Push the last blog if it has data
-  if (Object.keys(currentBlog).length > 0) {
-    results.push(currentBlog);
-  }
-
-  // Fill in missing fields with defaults
-  return results.map(blog => ({
-    title: blog.title || "Untitled Blog Post",
-    domain: blog.domain || "unknown.com",
-    description: blog.description || "No description provided",
-    keyInsight: blog.keyInsight || "No key insight provided",
-    url: blog.url || undefined,
-  })).slice(0, 4);
-}
