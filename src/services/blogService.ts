@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export interface BlogResult {
@@ -10,10 +9,12 @@ export interface BlogResult {
   url: string;
 }
 
-// Initialize Gemini with API key from environment variable
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+if (!apiKey) {
+  throw new Error("VITE_GEMINI_API_KEY is not set. Please configure it in your environment.");
+}
+const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-console.log('aa',genAI)
 
 export const generateBlogRecommendations = async (query: string): Promise<BlogResult[]> => {
   if (!query.trim()) return [];
@@ -34,26 +35,17 @@ export const generateBlogRecommendations = async (query: string): Promise<BlogRe
         "keyInsight": string,
         "url": string (hypothetical format)
       }
-      
-      Example:
-      [{
-        "title": "Indoor Composting with Pets",
-        "domain": "urbangardening.com/pet-compost",
-        "description": "Safe methods for apartment composting with cats/dogs",
-        "keyInsight": "Bokashi bins prevent pet access better than worm farms",
-        "url": "https://example.com/indoor-compost"
-      }]
     `;
 
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response.text();
-    
-    // Clean and parse response
-    const jsonString = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(jsonString);
+    console.log("Raw API response:", text);
 
-    return parsed.map((item: any, index: number) => ({
+    const jsonString = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(jsonString) as { title: string; domain: string; description: string; keyInsight: string; url?: string }[];
+
+    return parsed.map((item, index) => ({
       id: `gemini-${Date.now()}-${index}`,
       title: item.title,
       domain: item.domain,
@@ -62,14 +54,19 @@ export const generateBlogRecommendations = async (query: string): Promise<BlogRe
       url: item.url || `https://${item.domain}`
     }));
 
-  } catch (error) {
-    console.error("Gemini API error:", error);
+  } catch (error: any) {
+    console.error("Gemini API error:", error.message || error);
+    const errorMessage = error.message?.includes("API_KEY_INVALID")
+      ? "Invalid API key. Check VITE_GEMINI_API_KEY."
+      : error.message?.includes("rate limit")
+      ? "API rate limit exceeded. Try again later."
+      : "Couldn't fetch results. Please refine your query.";
     return [{
       id: 'error',
       title: "Search Failed",
       domain: "try-again.com",
-      description: "Couldn't fetch results. Please refine your query.",
-      keyInsight: "The API might be rate-limited or your query too vague",
+      description: errorMessage,
+      keyInsight: "Check API key, query, or server status",
       url: "#"
     }];
   }
