@@ -1,20 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SearchForm from './SearchForm';
 import ResultCard from './ResultCard';
-import { generateBlogRecommendations, BlogResult } from '../services/blogService';
+import { generateBlogRecommendations, BlogResult, hasApiKey } from '../services/blogService';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import ApiKeyForm from './ApiKeyForm';
 
 const BlogFinder: React.FC = () => {
   const [results, setResults] = useState<BlogResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [query, setQuery] = useState('');
+  const [isApiKeySet, setIsApiKeySet] = useState(hasApiKey());
+
+  useEffect(() => {
+    // Check if API key is set on component mount
+    setIsApiKeySet(hasApiKey());
+  }, []);
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       toast.error("Please enter a search query");
+      return;
+    }
+
+    if (!isApiKeySet) {
+      toast.error("Please set your Gemini API key first");
       return;
     }
 
@@ -29,9 +41,9 @@ const BlogFinder: React.FC = () => {
       if (blogResults.length === 0) {
         setHasError(true);
         toast.error("No results found. Try a different search.");
-      } else if (blogResults[0].id === 'error') {
+      } else if (blogResults[0].id === 'error' || blogResults[0].id === 'api-key-missing') {
         setHasError(true);
-        toast.error("Search failed. Please try again.");
+        toast.error(blogResults[0].description);
       } else {
         toast.success(`Found ${blogResults.length} blog posts`);
       }
@@ -60,6 +72,10 @@ const BlogFinder: React.FC = () => {
     }, 500);
   };
 
+  const handleApiKeySet = () => {
+    setIsApiKeySet(true);
+  };
+
   return (
     <div className="container max-w-4xl mx-auto p-4 min-h-screen">
       <header className="text-center mb-8 mt-8">
@@ -71,47 +87,53 @@ const BlogFinder: React.FC = () => {
         </p>
       </header>
 
-      <SearchForm 
-        onSearch={handleSearch} 
-        initialQuery={query}
-        isLoading={isLoading} 
-      />
+      {!isApiKeySet ? (
+        <ApiKeyForm onApiKeySet={handleApiKeySet} />
+      ) : (
+        <>
+          <SearchForm 
+            onSearch={handleSearch} 
+            initialQuery={query}
+            isLoading={isLoading} 
+          />
 
-      <div className="mt-10">
-        {isLoading ? (
-          <div className="text-center py-16">
-            <div className="inline-block w-16 h-16 border-4 border-forest border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-4 text-muted-foreground">Finding your perfect blog matches...</p>
-          </div>
-        ) : (
-          <>
-            {hasError ? (
-              <div className="text-center py-10 bg-muted/50 rounded-lg">
-                <p className="text-xl mb-4">🔍 No perfect matches - try adding more details!</p>
-                <Button onClick={handleRefineSearch} className="mt-2 bg-forest hover:bg-forest-light">
-                  Refine Your Search
-                </Button>
+          <div className="mt-10">
+            {isLoading ? (
+              <div className="text-center py-16">
+                <div className="inline-block w-16 h-16 border-4 border-forest border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-muted-foreground">Finding your perfect blog matches...</p>
               </div>
             ) : (
-              results.length > 0 && (
-                <div className="space-y-6 animate-fade-in">
-                  <h2 className="text-xl font-semibold mb-4">Found {results.length} blog posts for you:</h2>
-                  
-                  {results.map((result) => (
-                    <ResultCard key={result.id} result={result} />
-                  ))}
-                  
-                  <div className="text-center mt-8">
-                    <Button onClick={handleRefineSearch} className="bg-forest hover:bg-forest-light">
+              <>
+                {hasError ? (
+                  <div className="text-center py-10 bg-muted/50 rounded-lg">
+                    <p className="text-xl mb-4">🔍 No perfect matches - try adding more details!</p>
+                    <Button onClick={handleRefineSearch} className="mt-2 bg-forest hover:bg-forest-light">
                       Refine Your Search
                     </Button>
                   </div>
-                </div>
-              )
+                ) : (
+                  results.length > 0 && (
+                    <div className="space-y-6 animate-fade-in">
+                      <h2 className="text-xl font-semibold mb-4">Found {results.length} blog posts for you:</h2>
+                      
+                      {results.map((result) => (
+                        <ResultCard key={result.id} result={result} />
+                      ))}
+                      
+                      <div className="text-center mt-8">
+                        <Button onClick={handleRefineSearch} className="bg-forest hover:bg-forest-light">
+                          Refine Your Search
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -11,19 +11,42 @@ export interface BlogResult {
   url: string;
 }
 
-// Initialize the API
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-if (!apiKey) {
-  throw new Error("VITE_GEMINI_API_KEY is not set.");
-}
-const genAI = new GoogleGenerativeAI(apiKey);
+// Initialize the API with a default or stored key
+let apiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || '';
+let genAI: GoogleGenerativeAI | null = null;
 const geminiModel = "gemini-1.5-flash"; // Using a valid model name
+
+// Function to set the API key programmatically
+export const setApiKey = (key: string) => {
+  apiKey = key;
+  localStorage.setItem('gemini_api_key', key);
+  genAI = new GoogleGenerativeAI(apiKey);
+  return !!apiKey;
+};
+
+// Check if we have a key and initialize
+if (apiKey) {
+  genAI = new GoogleGenerativeAI(apiKey);
+}
+
+export const hasApiKey = () => !!apiKey && !!genAI;
 
 export async function generateBlogRecommendations(query: string): Promise<BlogResult[]> {
   if (!query.trim()) return [];
+  
+  if (!hasApiKey()) {
+    return [{
+      id: "api-key-missing",
+      title: "API Key Required",
+      domain: "configuration.required",
+      description: "Please set your Gemini API key to use this feature",
+      keyInsight: "An API key is required to access the Gemini AI model",
+      url: "https://ai.google.dev/"
+    }];
+  }
 
   try {
-    const model = genAI.getGenerativeModel({ model: geminiModel });
+    const model = genAI!.getGenerativeModel({ model: geminiModel });
 
     // Strict JSON-only prompt inspired by your software project
     const prompt = `
