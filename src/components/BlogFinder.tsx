@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import SearchForm from './SearchForm';
 import ResultCard from './ResultCard';
 import { generateBlogRecommendations } from '../services/blogService';
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 export interface BlogResult {

@@ -3,7 +3,7 @@ import React from 'react';
 import { ExternalLink, Copy, CheckCheck } from 'lucide-react';
 import { BlogResult } from './BlogFinder';
 import { copyToClipboard } from '../utils/clipboard';
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface ResultCardProps {
