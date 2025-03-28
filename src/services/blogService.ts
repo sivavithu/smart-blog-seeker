@@ -1,7 +1,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-interface BlogResult {
+export interface BlogResult {
   id: string;
   title: string;
   domain: string;
@@ -10,7 +10,7 @@ interface BlogResult {
   url: string;
 }
 
-// Initialize Gemini - use your free API key from Google AI Studio
+// Initialize Gemini with API key from environment variable
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -20,7 +20,7 @@ export const generateBlogRecommendations = async (query: string): Promise<BlogRe
   try {
     const prompt = `
       You are a blog recommendation expert. For this query: "${query}",
-      suggest 3 real blog posts with:
+      suggest 4 real blog posts with:
       1. Exact match to the user's need
       2. Authoritative sources
       3. Practical insights

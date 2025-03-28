@@ -2,18 +2,9 @@
 import React, { useState } from 'react';
 import SearchForm from './SearchForm';
 import ResultCard from './ResultCard';
-import { generateBlogRecommendations } from '../services/blogService';
+import { generateBlogRecommendations, BlogResult } from '../services/blogService';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-
-export interface BlogResult {
-  id: string;
-  title: string;
-  domain: string;
-  description: string;
-  keyInsight: string;
-  url: string;
-}
 
 const BlogFinder: React.FC = () => {
   const [results, setResults] = useState<BlogResult[]>([]);
@@ -37,6 +28,12 @@ const BlogFinder: React.FC = () => {
       
       if (blogResults.length === 0) {
         setHasError(true);
+        toast.error("No results found. Try a different search.");
+      } else if (blogResults[0].id === 'error') {
+        setHasError(true);
+        toast.error("Search failed. Please try again.");
+      } else {
+        toast.success(`Found ${blogResults.length} blog posts`);
       }
     } catch (error) {
       console.error('Error searching blogs:', error);
